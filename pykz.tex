@@ -5,11 +5,134 @@
 % A package that combines the speed of Python for numerical calculation and the
 % drawing capabilities of TikZ, to make publication-quality drawing faster.
 %
+% Some conventions:
+%
+%   \@pik@<name> : PykZ internal key <name>
+%   \@piv@<name> : PykZ internal variable <name>
+%   \@pic@<name> : PykZ internal command <name>
+%   @pie@<name> : PykZ internal environment <name>
+%
 % Danylo Malyuta, 2020
 % 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\makeatletter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Load packages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \usepackage{tikz}
+\usepackage{tikz-3dplot}
+\usepackage{pythontex}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Load TikZ libraries
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usetikzlibrary{arrows}
+\usetikzlibrary{intersections}
+\usetikzlibrary{decorations.markings}
+% \usetikzlibrary{math}
+% \usetikzlibrary{calc}
+% \usetikzlibrary{shapes}
+% \usetikzlibrary{tikzmark}
+% \usetikzlibrary{positioning}
+% \usetikzlibrary{scopes}
+% \usetikzlibrary{shapes.multipart}
+% \usetikzlibrary{shapes.geometric}
+% \usetikzlibrary{bending}
+% \usetikzlibrary{decorations.text}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% General functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\define@key{@pik@keys}{relpath}{\def\@piv@relpath{#1}}
+\newcommand{\pykz@init}[1][]{
+  \setkeys{@pik@keys}{relpath=.,#1}
+  \xdef\@piv@relpath{\@piv@relpath}
+  % TODO start a Python server running in background
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Math library
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\NewEnviron{@pie@shell}{
+  \immediate\write18{\BODY}
+}
+
+\define@key{@pik@keys}{out}{\def\@piv@out{#1}}
+\newcommand{\pykz@matrix@multiply}[3][]{
+  % -----------------------------------------------
+  % Matrix multiplication #2*#3.
+  %
+  % Parameters
+  % ----------
+  % #1 : parameters (out: what to name the result)
+  % #2 : left matrix
+  % #3 : right matrix
+  % -----------------------------------------------
+  \setkeys{@pik@keys}{out=out,#1}
+  \xdef\@piv@out{"\@piv@out"}
+\begin{@pie@shell}
+curdir=$(pwd) &&
+cd \@piv@relpath &&
+python -c 'import functions as f;
+f.matrix_multiply(#2,#3,out=\@piv@out)' > $curdir/tmp.tex
+\end{@pie@shell}
+% \begin{@pie@shell}
+% curdir=$(pwd) &&
+% cd \@piv@relpath &&
+% echo Hello &&
+% python -c 'import functions as f; print("hello")' > $curdir/tmp.tex
+% \end{@pie@shell}
+  \input{tmp.tex}
+}
+
+\newcommand{\pykz@matrix@inverse}[2][]{
+  % -----------------------------------------------
+  % Invert matrix #2.
+  %
+  % Parameters
+  % ----------
+  % #1 : parameters (out: what to name the result)
+  % #2 : matrix to be inverted
+  % -----------------------------------------------
+  \setkeys{@pik@keys}{out=out,#1}
+  \xdef\@piv@out{"\@piv@out"}
+\begin{@pie@shell}
+curdir=$(pwd) &&
+cd \@piv@relpath &&
+python -c 'import functions as f;
+f.matrix_inverse(#2,out=\@piv@out)' > $curdir/tmp.tex
+\end{@pie@shell}
+  \input{tmp.tex}
+}
+
+\newcommand{\pykz@matrix@add}[3][]{
+  % -----------------------------------------------
+  % Add matrices #2+#3.
+  %
+  % Parameters
+  % ----------
+  % #1 : parameters (out: what to name the result)
+  % #2 : left matrix
+  % #3 : right matrix
+  % -----------------------------------------------
+  \setkeys{@pik@keys}{out=out,#1}
+  \xdef\@piv@out{"\@piv@out"}
+\begin{@pie@shell}
+curdir=$(pwd) &&
+cd \@piv@relpath &&
+python -c 'import functions as f;
+f.matrix_add(#2,#3,out=\@piv@out)' > $curdir/tmp.tex
+\end{@pie@shell}
+  \input{tmp.tex}
+}
+
+\makeatother
 
 %%% Local Variables:
 %%% mode: latex
