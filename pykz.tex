@@ -76,6 +76,62 @@ sleep \@piv@python@delay
   \immediate\write18{\BODY}
 }
 
+\NewEnviron{pykzpicture}[2][]{
+  % ---------------------------------------------------------
+  %
+  % A wrapper of the tikzpicture environment, which does all the PykZ
+  % initialization in the background
+  %
+  % Parameters
+  % ----------
+  % #1 : same options as you would pass tikzpicture
+  % #2 : relative location of PykZ directory
+  %
+  % ---------------------------------------------------------
+
+  \pykzinit[relpath=#2] % Initialize PykZ
+
+  % -------------------------------------
+  % 3D coordinate initial angles
+  % -------------------------------------
+  \xdef\@piv@td@main@alt{0}
+  \xdef\@piv@td@main@azi{0}
+  \tdplotsetmaincoords{\@piv@td@main@alt}{\@piv@td@main@azi}
+  \pykzmath{(np.eye(3)).tolist()}
+  \xdef\@piv@td@R{\out}
+  
+  \begin{tikzpicture}[
+    line cap=round,
+    line join=bevel,
+    #1]
+    
+    % -------------------------------------
+    % Common styles
+    %-------------------------------------
+    \tikzset
+    {
+      every node/.append style=
+      {
+        inner sep=0,
+        outer sep=0
+      },
+      arrow/.append style=
+      {
+        -latex
+      },
+      label/.append style=
+      {
+        outer sep=1
+      }
+    }
+
+    % -------------------------------------
+    % User code
+    %-------------------------------------
+    \BODY
+  \end{tikzpicture}
+}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Math library
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -93,6 +149,29 @@ cd \@piv@relpath &&
 mv result.tex $curdir
 \end{@pie@shell}
   \input{result.tex}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Utilities
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\def\convertto#1#2{\strip@pt\dimexpr #2*65536/\number\dimexpr 1#1}
+\define@key{@dimensionalize@keys}{unit}{\def\@@@unit{#1}}
+\newcommand{\dimensionalize}[2][]{%
+  %
+  % Append to #1 the unit \@@@unit.
+  % Common use case is to append "pt" to a tikzmath output.
+  %
+  % -- Parameters
+  \setkeys{@dimensionalize@keys}{unit=pt,#1}%
+  % -- Function body
+  \foreach \@@var in {#2} {
+    \tikzmath{\@@@@value=\@@var;} % to pt
+    \def\@pt@unit{pt}%
+    \xdef\@@@@tmp{\@@@@value\@pt@unit} % append "pt" unit
+    \expandafter\xdef\@@var{\convertto{\@@@unit}{\@@@@tmp}\@@@unit} % convert to target unit
+  }
 }
 
 \makeatother
