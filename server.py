@@ -1,6 +1,10 @@
 import numpy as np
 import numpy.linalg as la
 import socket
+import importlib
+
+import sys
+sys.path.append("../../")
 
 class Server:
     def __init__(self,ip,port):
@@ -96,6 +100,19 @@ if __name__ == "__main__":
     while True:
         conn = server.wait_connection()
         msg = server.receive(conn)
-        # Evaluate message
-        result = eval(msg)
-        server.send(str(result),conn)
+        if "<function>" in msg.decode('ascii'):
+            import pykz_custom
+            importlib.reload(pykz_custom)
+            try:
+                method_name = msg.decode('ascii')[11:-1]
+                output = getattr(pykz_custom, method_name)()
+                if type(output) is dict:
+                    for key,val in output.items():
+                        exec(key + '=val') # Save outputs
+                msg = "executed %s"%(method_name)
+            except:
+                msg = "failed to execute %s"%(method_name)
+            server.send(str(msg),conn)
+        else:
+            result = eval(msg) # Evaluate message
+            server.send(str(result),conn)

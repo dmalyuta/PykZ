@@ -25,17 +25,20 @@
 \usepackage{tikz}
 \usepackage{tikz-3dplot}
 \usepackage{pythontex}
+\usepackage{filecontents}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Load TikZ libraries
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \usetikzlibrary{arrows}
+\usetikzlibrary{arrows.meta}
 \usetikzlibrary{intersections}
-\usetikzlibrary{decorations.markings}
 \usetikzlibrary{math}
 \usetikzlibrary{shapes}
 \usetikzlibrary{positioning}
+\usetikzlibrary{decorations.markings}
+\usetikzlibrary{decorations.pathreplacing}
 % \usetikzlibrary{calc}
 % \usetikzlibrary{tikzmark}
 % \usetikzlibrary{scopes}
@@ -70,23 +73,25 @@ python server.py &
 \begin{@pie@shell}
 sleep \@piv@python@delay
 \end{@pie@shell}
+  % Determine path to directory where latex_common resides
+  \pykzmathinline[@piv@pypath]{'\@piv@relpath'[:'\@piv@relpath'.find('latex_common')]}
 }
 
 \NewEnviron{@pie@shell}{
   \immediate\write18{\BODY}
 }
 
-\NewEnviron{pykzpicture}[2][]{
+\newenvironment{pykzpicture}[2][]{
   % ---------------------------------------------------------
-  %
+  % 
   % A wrapper of the tikzpicture environment, which does all the PykZ
   % initialization in the background
-  %
+  % 
   % Parameters
   % ----------
   % #1 : same options as you would pass tikzpicture
   % #2 : relative location of PykZ directory
-  %
+  % 
   % ---------------------------------------------------------
 
   \pykzinit[relpath=#2] % Initialize PykZ
@@ -97,38 +102,62 @@ sleep \@piv@python@delay
   \xdef\@piv@td@main@alt{0}
   \xdef\@piv@td@main@azi{0}
   \tdplotsetmaincoords{\@piv@td@main@alt}{\@piv@td@main@azi}
-  \pykzmath{(np.eye(3)).tolist()}
+  \pykzmathinline{(np.eye(3)).tolist()}
   \xdef\@piv@td@R{\out}
   
   \begin{tikzpicture}[
+    % Rounded line ends
     line cap=round,
+    % Bevelled (non-sharp) polygon corners
     line join=bevel,
+    % User commands
     #1]
-    
+
     % -------------------------------------
     % Common styles
-    %-------------------------------------
+    % -------------------------------------
     \tikzset
     {
+      % No default separation
       every node/.append style=
       {
         inner sep=0,
         outer sep=0
       },
+      % Default arrow
       arrow/.append style=
       {
         -latex
       },
+      % Text labels
       label/.append style=
       {
         outer sep=1
-      }
+      },
+      % Bezier curve controls style
+      bezier/.style={
+        postaction={
+          decoration={
+            show path construction,
+            curveto code={
+              \draw [blue] 
+              (\tikzinputsegmentfirst) -- (\tikzinputsegmentsupporta)
+              (\tikzinputsegmentlast) -- (\tikzinputsegmentsupportb);
+              \fill [red, opacity=0.5] 
+              (\tikzinputsegmentsupporta) circle [radius=.5ex]
+              (\tikzinputsegmentsupportb) circle [radius=.5ex];
+            }
+          },
+          decorate
+        }}
     }
 
     % -------------------------------------
     % User code
-    %-------------------------------------
-    \BODY
+    % -------------------------------------
+  }
+  % BODY
+  {
   \end{tikzpicture}
 }
 
@@ -136,35 +165,78 @@ sleep \@piv@python@delay
 % Math library
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newcommand{\pykzmath}[1]{
+\newcommand{\pykzmathinline}[2][]{
   % ---------------------------------------------------------
   %
-  % Send math command to Python, and store result in \out.
+  % Send one-line math command to Python, and store result in \out.
   %
   % ---------------------------------------------------------  
 \begin{@pie@shell}
 curdir=$(pwd) &&
 cd \@piv@relpath &&
-./client "#1" &&
+./client "#2" &&
 mv result.tex $curdir
 \end{@pie@shell}
   \input{result.tex}
+  \ifthenelse{\equal{#1}{}}{}{\expandafter\xdef\csname #1\endcsname{\out}}
 }
+
+\newenvironment{pykzmathblock}
+% ---------------------------------------------------------
+% 
+% Save a block of Python code in a file accessible to PykZ
+% for later execution.
+% 
+% ---------------------------------------------------------  
+{\VerbatimOut{pykz_custom.py}}
+{\endVerbatimOut
+\begin{@pie@shell}
+mv pykz_custom.py \@piv@pypath
+\end{@pie@shell}
+}
+
+\newcommand{\pykzmathfunction}[1]{
+  % ---------------------------------------------------------
+  %
+  % Call a function in pykz_custom.py, and store result in
+  % local variables of Python session.
+  %
+  % ---------------------------------------------------------  
+\begin{@pie@shell}
+cd \@piv@relpath && ./client "<function> #1"
+\end{@pie@shell}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Drawing
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\renewcommand{\bezier}[2]{%
+  % ---------------------------------------------------------
+  %
+  % Bezier curve controls.
+  %
+  % Parameters
+  % ----------
+  % #1 : angle:radius for start point control
+  % #2 : angle:radius for end point control
+  %
+  % ---------------------------------------------------------  
+  .. controls ++(#1) and ++(#2) ..}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Utilities
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 \def\convertto#1#2{\strip@pt\dimexpr #2*65536/\number\dimexpr 1#1}
-\define@key{@dimensionalize@keys}{unit}{\def\@@@unit{#1}}
+\define@key{@pik@keys}{unit}{\def\@@@unit{#1}}
 \newcommand{\dimensionalize}[2][]{%
   %
   % Append to #1 the unit \@@@unit.
   % Common use case is to append "pt" to a tikzmath output.
   %
   % -- Parameters
-  \setkeys{@dimensionalize@keys}{unit=pt,#1}%
+  \setkeys{@pik@keys}{unit=pt,#1}%
   % -- Function body
   \foreach \@@var in {#2} {
     \tikzmath{\@@@@value=\@@var;} % to pt
@@ -172,6 +244,18 @@ mv result.tex $curdir
     \xdef\@@@@tmp{\@@@@value\@pt@unit} % append "pt" unit
     \expandafter\xdef\@@var{\convertto{\@@@unit}{\@@@@tmp}\@@@unit} % convert to target unit
   }
+}
+
+\define@key{@pik@keys}{amount}{\def\@@amount{#1}}
+\newcommand{\counter@increment}[2][]{%
+  %
+  % Increments counter #2 by increment amount #1 (default: 1).
+  %
+  % -- Parameters
+  \setkeys{@pik@keys}{amount=1,#1}%
+  % -- Function body
+  \tikzmath{\@@counter@next=int(#2+\@@amount);}%
+  \xdef#2{\@@counter@next}%
 }
 
 \makeatother

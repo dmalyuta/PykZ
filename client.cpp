@@ -120,8 +120,11 @@ int main(int argc, char** argv)
   // Send command to Python and receive reply
   socket_communication::Client client("127.0.0.1",1234);
   client.Send(cmd);
-  std::string msg = client.Receive();
 
+  // Receive response
+  std::string msg = client.Receive();
+  std::cout << "[Client]: Received " << msg << std::endl;
+  
   // Save output to file
   write_to_file(msg);
 
