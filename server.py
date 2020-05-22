@@ -98,14 +98,18 @@ if __name__ == "__main__":
     server = Server(ip="127.0.0.1",port=1234)
 
     while True:
+        # ..:: Receive message for processing ::..
         conn = server.wait_connection()
         msg = server.receive(conn)
+        # ..:: Import custom functions that may have been defined ::..
+        import pykz_custom as F
+        importlib.reload(F)
         if "<function>" in msg.decode('ascii'):
-            import pykz_custom
-            importlib.reload(pykz_custom)
+            # ..:: Process function ::..
             try:
                 method_name = msg.decode('ascii')[11:-1]
-                output = getattr(pykz_custom, method_name)()
+                exec('output=' + method_name)
+                # output = getattr(pykz_custom, method_name)()
                 if type(output) is dict:
                     for key,val in output.items():
                         exec(key + '=val') # Save outputs
@@ -114,5 +118,6 @@ if __name__ == "__main__":
                 msg = "failed to execute %s"%(method_name)
             server.send(str(msg),conn)
         else:
+            # ..:: Receive one-liner ::..
             result = eval(msg) # Evaluate message
             server.send(str(result),conn)

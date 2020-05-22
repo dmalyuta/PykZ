@@ -99,8 +99,8 @@ sleep \@piv@python@delay
   % -------------------------------------
   % 3D coordinate initial angles
   % -------------------------------------
-  \xdef\@piv@td@main@alt{0}
-  \xdef\@piv@td@main@azi{0}
+  \xdef\@piv@td@main@alt{60}
+  \xdef\@piv@td@main@azi{125}
   \tdplotsetmaincoords{\@piv@td@main@alt}{\@piv@td@main@azi}
   \pykzmathinline{(np.eye(3)).tolist()}
   \xdef\@piv@td@R{\out}
@@ -239,10 +239,15 @@ cd \@piv@relpath && ./client "<function> #1"
   \setkeys{@pik@keys}{unit=pt,#1}%
   % -- Function body
   \foreach \@@var in {#2} {
-    \tikzmath{\@@@@value=\@@var;} % to pt
-    \def\@pt@unit{pt}%
-    \xdef\@@@@tmp{\@@@@value\@pt@unit} % append "pt" unit
-    \expandafter\xdef\@@var{\convertto{\@@@unit}{\@@@@tmp}\@@@unit} % convert to target unit
+    \ifthenelse{\equal{\@@@unit}{}}{
+      \pykzmathinline{'\@@var'[:-2]}
+      \expandafter\xdef\@@var{\out}
+    }{
+      \tikzmath{\@@@@value=\@@var;} % to pt
+      \def\@pt@unit{pt}%
+      \xdef\@@@@tmp{\@@@@value\@pt@unit} % append "pt" unit
+      \expandafter\xdef\@@var{\convertto{\@@@unit}{\@@@@tmp}\@@@unit} % convert to target unit
+    }
   }
 }
 
