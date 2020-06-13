@@ -102,8 +102,11 @@ if __name__ == "__main__":
         conn = server.wait_connection()
         msg = server.receive(conn)
         # ..:: Import custom functions that may have been defined ::..
-        import pykz_custom as F
-        importlib.reload(F)
+        try:
+            import pykz_custom as F
+            importlib.reload(F)
+        except Exception as e:
+            print("[Server] Unable to import pykz_custom ("+str(e)+")")
         if "<function>" in msg.decode('ascii'):
             # ..:: Process function ::..
             try:
