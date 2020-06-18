@@ -39,6 +39,7 @@
 \usetikzlibrary{positioning}
 \usetikzlibrary{decorations.markings}
 \usetikzlibrary{decorations.pathreplacing}
+\usetikzlibrary{tikzmark}
 % \usetikzlibrary{calc}
 % \usetikzlibrary{tikzmark}
 % \usetikzlibrary{scopes}
@@ -53,16 +54,15 @@
 
 \gdef\@piv@python@delay{0.5} % Startup wait for Python server
 
-\define@key{@pik@keys}{relpath}{\def\@piv@relpath{#1}}
-\newcommand{\pykzinit}[1][]{
+\newcommand{\pykzinit}[1]{
   % ---------------------------------------------------------
   %
   % Initialization of PykZ.
   % Starts the Python background server process.
+  % Must be called before doing anything that uses PykZ.
   %
   % ---------------------------------------------------------
-  \setkeys{@pik@keys}{relpath=.,#1}
-  \xdef\@piv@relpath{\@piv@relpath}
+  \xdef\@piv@relpath{#1}
   % Start a background Python server
 \begin{@pie@shell}
 curdir=$(pwd) &&
@@ -81,7 +81,7 @@ sleep \@piv@python@delay
   \immediate\write18{\BODY}
 }
 
-\newenvironment{pykzpicture}[2][]{
+\newenvironment{pykzpicture}[1][]{
   % ---------------------------------------------------------
   % 
   % A wrapper of the tikzpicture environment, which does all the PykZ
@@ -93,8 +93,6 @@ sleep \@piv@python@delay
   % #2 : relative location of PykZ directory
   % 
   % ---------------------------------------------------------
-
-  \pykzinit[relpath=#2] % Initialize PykZ
 
   % -------------------------------------
   % 3D coordinate initial angles
@@ -223,6 +221,37 @@ cd \@piv@relpath && ./client "<function> #1"
   %
   % ---------------------------------------------------------  
   .. controls ++(#1) and ++(#2) ..}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Beamer tools
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newenvironment{pageplace}[1]
+{
+  \xdef\@pos@args{#1}
+  \pykzpicture[remember picture,
+  overlay,
+  shift={(current page.center)}]
+  \pykzmathinline[@arg@length]{len([\@pos@args])}
+  \ifthenelse{\equal{\@arg@length}{2}}{
+    % Direct position
+    \pykzmathinline[@pos@x]{str([\@pos@args][0]).replace(chr(39),'')}
+    \pykzmathinline[@pos@y]{str([\@pos@args][1]).replace(chr(39),'')}
+    \dimensionalize{\@pos@x,\@pos@y}
+  }{
+    % Position using grid
+    \tikzmath{
+      \@page@width = \paperwidth;
+      \@page@height = \paperheight;
+    }
+    \pykzmathinline[@pos@x]{(([\@pos@args][3]-0.5)/[\@pos@args][1]-0.5)*\@page@width}
+    \pykzmathinline[@pos@y]{(-([\@pos@args][2]-0.5)/[\@pos@args][0]+0.5)*\@page@height}
+    \dimensionalize{\@pos@x,\@pos@y}
+  }
+  \coordinate (loc) at (\@pos@x,\@pos@y);
+}{
+  \endpykzpicture
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Utilities
