@@ -104,7 +104,7 @@ std::string Client::Receive()
 void write_to_file(std::string msg)
 {
   std::ofstream out("result.tex");
-  out << "\\xdef\\out{" << msg << "}";
+  out << "\\xdef\\out{" << msg << "}%";
   out.close();
 }
 

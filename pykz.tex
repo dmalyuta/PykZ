@@ -31,6 +31,7 @@
 % Load TikZ libraries
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\usetikzlibrary{backgrounds}
 \usetikzlibrary{arrows}
 \usetikzlibrary{arrows.meta}
 \usetikzlibrary{intersections}
@@ -77,11 +78,11 @@ sleep \@piv@python@delay
   \pykzmathinline[@piv@pypath]{'\@piv@relpath'[:'\@piv@relpath'.find('latex_common')]}
 }
 
-\NewEnviron{@pie@shell}{
-  \immediate\write18{\BODY}
+\NewEnviron{@pie@shell}{%
+  \immediate\write18{\BODY}%
 }
 
-\newenvironment{pykzpicture}[1][]{
+\newenvironment{pykzpicture}[1][]{%
   % ---------------------------------------------------------
   % 
   % A wrapper of the tikzpicture environment, which does all the PykZ
@@ -93,24 +94,25 @@ sleep \@piv@python@delay
   % #2 : relative location of PykZ directory
   % 
   % ---------------------------------------------------------
-
+  % 
   % -------------------------------------
-  % 3D coordinate initial angles
+  % Check if 3D required
   % -------------------------------------
-  \xdef\@piv@td@main@alt{60}
-  \xdef\@piv@td@main@azi{125}
-  \tdplotsetmaincoords{\@piv@td@main@alt}{\@piv@td@main@azi}
-  \pykzmathinline{(np.eye(3)).tolist()}
-  \xdef\@piv@td@R{\out}
-  
+  \edef\@threed{3d}%
+  \pykzmathinline[@use@threed]{'\@threed' in str('#1')}%
+  \pykzmathinline[@tikz@opts]{str('#1').replace('\@threed,','').
+    replace(',\@threed','').replace('\@threed','')}%
+  % -------------------------------------
+  % Start the tikzpicture
+  % -------------------------------------
   \begin{tikzpicture}[
     % Rounded line ends
     line cap=round,
     % Bevelled (non-sharp) polygon corners
     line join=bevel,
     % User commands
-    #1]
-
+    \@tikz@opts]
+    % 
     % -------------------------------------
     % Common styles
     % -------------------------------------
@@ -148,35 +150,64 @@ sleep \@piv@python@delay
           },
           decorate
         }}
+    }%
+    % 
+    % -------------------------------------
+    % Activate 3D plot
+    % -------------------------------------
+    \ifthenelse{\equal{\@use@threed}{True}}{
+      \xdef\@piv@td@main@alt{60}%
+      \xdef\@piv@td@main@azi{125}%
+      \tdplotsetmaincoords{\@piv@td@main@alt}{\@piv@td@main@azi}%
+      \pykzmathinline[@piv@td@R]{(np.eye(3)).tolist()}%
+    }{}
+    \pykzmathinline[@threed@cmd]{'tdplot_main_coords' if (\@use@threed) else ''}%
+    \begin{scope}[\@threed@cmd]%
+      % 
+      % -------------------------------------
+      % User code
+      % -------------------------------------
     }
-
-    % -------------------------------------
-    % User code
-    % -------------------------------------
-  }
-  % BODY
-  {
-  \end{tikzpicture}
+    % BODY
+    {
+    \end{scope}%
+  \end{tikzpicture}%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Math library
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newcommand{\pykzmathinline}[2][]{
+\newcommand{\pykzexec}[1]{%
+  % ---------------------------------------------------------
+  %
+  % Call a function in pykz_custom.py, and store result in
+  % local variables of Python session.
+  %
+  % ---------------------------------------------------------  
+\begin{@pie@shell}
+cd \@piv@relpath && ./client "<exec> #1"
+\end{@pie@shell}%
+}
+
+\newcommand{\pykzmathinline}[2][]{%
   % ---------------------------------------------------------
   %
   % Send one-line math command to Python, and store result in \out.
   %
   % ---------------------------------------------------------  
-\begin{@pie@shell}
+\begin{@pie@shell}%
 curdir=$(pwd) &&
 cd \@piv@relpath &&
 ./client "#2" &&
 mv result.tex $curdir
-\end{@pie@shell}
-  \input{result.tex}
-  \ifthenelse{\equal{#1}{}}{}{\expandafter\xdef\csname #1\endcsname{\out}}
+\end{@pie@shell}%
+  \input{result.tex}%
+  \ifthenelse{\equal{\out}{PYKZ_FAIL}}{%
+    \PackageError{PykZ}{Python failed to process your command}{%
+      Is your command proper Python syntax?}%
+  }{}%
+  \ifthenelse{\equal{#1}{}}{}{\expandafter\xdef\csname #1\endcsname{\out}}%
 }
 
 \newenvironment{pykzmathblock}
@@ -267,17 +298,17 @@ cd \@piv@relpath && ./client "<function> #1"
   % -- Parameters
   \setkeys{@pik@keys}{unit=pt,#1}%
   % -- Function body
-  \foreach \@@var in {#2} {
-    \ifthenelse{\equal{\@@@unit}{}}{
-      \pykzmathinline{'\@@var'[:-2]}
-      \expandafter\xdef\@@var{\out}
-    }{
-      \tikzmath{\@@@@value=\@@var;} % to pt
+  \foreach \@@var in {#2} {%
+    \ifthenelse{\equal{\@@@unit}{}}{%
+      \pykzmathinline{'\@@var'[:-2]}%
+      \expandafter\xdef\@@var{\out}%
+    }{%
+      \tikzmath{\@@@@value=\@@var;}% % to pt
       \def\@pt@unit{pt}%
-      \xdef\@@@@tmp{\@@@@value\@pt@unit} % append "pt" unit
-      \expandafter\xdef\@@var{\convertto{\@@@unit}{\@@@@tmp}\@@@unit} % convert to target unit
-    }
-  }
+      \xdef\@@@@tmp{\@@@@value\@pt@unit}% % append "pt" unit
+      \expandafter\xdef\@@var{\convertto{\@@@unit}{\@@@@tmp}\@@@unit}% % convert to target unit
+    }%
+  }%
 }
 
 \define@key{@pik@keys}{amount}{\def\@@amount{#1}}

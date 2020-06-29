@@ -2,7 +2,9 @@ import numpy as np
 import numpy.linalg as la
 import socket
 import importlib
+import traceback
 
+import os
 import sys
 sys.path.append("../../")
 
@@ -107,20 +109,28 @@ if __name__ == "__main__":
             importlib.reload(F)
         except Exception as e:
             print("[Server] Unable to import pykz_custom ("+str(e)+")")
-        if "<function>" in msg.decode('ascii'):
-            # ..:: Process function ::..
-            try:
-                method_name = msg.decode('ascii')[11:-1]
+        msg = msg.decode('ascii')
+        try:
+            if "<function>" in msg:
+                # ..:: Process function ::..
+                method_name = msg[11:-1]
                 exec('output=' + method_name)
                 # output = getattr(pykz_custom, method_name)()
                 if type(output) is dict:
                     for key,val in output.items():
                         exec(key + '=val') # Save outputs
                 msg = "executed %s"%(method_name)
-            except:
-                msg = "failed to execute %s"%(method_name)
-            server.send(str(msg),conn)
-        else:
-            # ..:: Receive one-liner ::..
-            result = eval(msg) # Evaluate message
-            server.send(str(result),conn)
+                server.send(str(msg),conn)
+            elif "<exec>" in msg:
+                # ..:: Process custom one-line "any" command ::..
+                cmd = msg[7:]
+                exec(cmd) # Execute command
+                msg = "executed"
+                server.send(str(msg),conn)
+            else:
+                # ..:: Process one-liner result=... command ::..
+                result=eval(msg) # Evaluate message
+                server.send(str(result),conn)    
+        except:
+            traceback.print_exc()
+            server.send('PYKZ_FAIL',conn)
