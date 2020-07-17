@@ -4,6 +4,9 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#define size_message_length_ 1024 // Buffer size for the length [B]
+#define size_sz_length_ 4 // Buffer size for the message length content [B]
+
 namespace socket_communication
 {
 
@@ -20,8 +23,6 @@ class Client
 
  private:
   int client_;
-  int size_message_length_ = 1024; // Buffer size for the length [B]
-  int size_sz_length_ = 4; // Buffer size for the message length content [B]
 };
 
 Client::Client() {}
