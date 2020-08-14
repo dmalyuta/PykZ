@@ -41,6 +41,7 @@
 \usetikzlibrary{decorations.markings}
 \usetikzlibrary{decorations.pathreplacing}
 \usetikzlibrary{tikzmark}
+\usetikzlibrary{fadings}
 % \usetikzlibrary{calc}
 % \usetikzlibrary{tikzmark}
 % \usetikzlibrary{scopes}
@@ -105,13 +106,18 @@ sleep \@piv@python@delay
   % -------------------------------------
   % Start the tikzpicture
   % -------------------------------------
+  \tikzset{%
+    apply style/.code={%
+      \tikzset{#1}%
+    }%
+  }%
   \begin{tikzpicture}[
     % Rounded line ends
     line cap=round,
     % Bevelled (non-sharp) polygon corners
     line join=bevel,
     % User commands
-    \@tikz@opts]
+    apply style/.expand once=\@tikz@opts]
     % 
     % -------------------------------------
     % Common styles
@@ -282,6 +288,17 @@ cd \@piv@relpath && ./client "<function> #1"
   \coordinate (loc) at (\@pos@x,\@pos@y);
 }{
   \endpykzpicture
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Drawing helpers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\shift}[2]{%
+  %
+  % Shift a point #1 by amount #2.
+  %
+  ($(#1)+(#2)$)%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
