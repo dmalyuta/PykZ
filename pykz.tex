@@ -13,7 +13,7 @@
 %   @pie@<name> : PykZ internal environment <name>
 %
 % Danylo Malyuta, 2020
-% 
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \makeatletter
@@ -22,33 +22,7 @@
 % Load packages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\usepackage{tikz}
-\usepackage{tikz-3dplot}
-\usepackage{pythontex}
 \usepackage{filecontents}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Load TikZ libraries
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\usetikzlibrary{backgrounds}
-\usetikzlibrary{arrows}
-\usetikzlibrary{arrows.meta}
-\usetikzlibrary{intersections}
-\usetikzlibrary{math}
-\usetikzlibrary{shapes}
-\usetikzlibrary{positioning}
-\usetikzlibrary{decorations.markings}
-\usetikzlibrary{decorations.pathreplacing}
-\usetikzlibrary{decorations.text}
-\usetikzlibrary{tikzmark}
-\usetikzlibrary{fadings}
-% \usetikzlibrary{calc}
-% \usetikzlibrary{tikzmark}
-% \usetikzlibrary{scopes}
-% \usetikzlibrary{shapes.multipart}
-% \usetikzlibrary{shapes.geometric}
-% \usetikzlibrary{bending}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % General functions
@@ -85,17 +59,17 @@ sleep \@piv@python@delay
 
 \newenvironment{pykzpicture}[1][]{%
   % ---------------------------------------------------------
-  % 
+  %
   % A wrapper of the tikzpicture environment, which does all the PykZ
   % initialization in the background
-  % 
+  %
   % Parameters
   % ----------
   % #1 : same options as you would pass tikzpicture
   % #2 : relative location of PykZ directory
-  % 
+  %
   % ---------------------------------------------------------
-  % 
+  %
   % -------------------------------------
   % Check if 3D required
   % -------------------------------------
@@ -118,7 +92,7 @@ sleep \@piv@python@delay
     line join=bevel,
     % User commands
     apply style/.expand once=\@tikz@opts]
-    % 
+    %
     % -------------------------------------
     % Common styles
     % -------------------------------------
@@ -146,10 +120,10 @@ sleep \@piv@python@delay
           decoration={
             show path construction,
             curveto code={
-              \draw [blue] 
+              \draw [blue]
               (\tikzinputsegmentfirst) -- (\tikzinputsegmentsupporta)
               (\tikzinputsegmentlast) -- (\tikzinputsegmentsupportb);
-              \fill [red, opacity=0.5] 
+              \fill [red, opacity=0.5]
               (\tikzinputsegmentsupporta) circle [radius=.5ex]
               (\tikzinputsegmentsupportb) circle [radius=.5ex];
             }
@@ -157,7 +131,7 @@ sleep \@piv@python@delay
           decorate
         }}
     }%
-    % 
+    %
     % -------------------------------------
     % Activate 3D plot
     % -------------------------------------
@@ -169,7 +143,7 @@ sleep \@piv@python@delay
     }{}
     \pykzmathinline[@threed@cmd]{'tdplot_main_coords' if (\@use@threed) else ''}%
     \begin{scope}[\@threed@cmd]%
-      % 
+      %
       % -------------------------------------
       % User code
       % -------------------------------------
@@ -190,7 +164,7 @@ sleep \@piv@python@delay
   % Call a function in pykz_custom.py, and store result in
   % local variables of Python session.
   %
-  % ---------------------------------------------------------  
+  % ---------------------------------------------------------
 \begin{@pie@shell}
 cd \@piv@relpath && ./client "<exec> #1"
 \end{@pie@shell}%
@@ -201,7 +175,7 @@ cd \@piv@relpath && ./client "<exec> #1"
   %
   % Send one-line math command to Python, and store result in \out.
   %
-  % ---------------------------------------------------------  
+  % ---------------------------------------------------------
 \begin{@pie@shell}%
 curdir=$(pwd) &&
 cd \@piv@relpath &&
@@ -218,11 +192,11 @@ mv result.tex $curdir
 
 \newenvironment{pykzmathblock}
 % ---------------------------------------------------------
-% 
+%
 % Save a block of Python code in a file accessible to PykZ
 % for later execution.
-% 
-% ---------------------------------------------------------  
+%
+% ---------------------------------------------------------
 {\VerbatimOut{pykz_custom.py}}
 {\endVerbatimOut
 \begin{@pie@shell}
@@ -236,7 +210,7 @@ mv pykz_custom.py \@piv@pypath
   % Call a function in pykz_custom.py, and store result in
   % local variables of Python session.
   %
-  % ---------------------------------------------------------  
+  % ---------------------------------------------------------
 \begin{@pie@shell}
 cd \@piv@relpath && ./client "<function> #1"
 \end{@pie@shell}
@@ -256,7 +230,7 @@ cd \@piv@relpath && ./client "<function> #1"
   % #1 : angle:radius for start point control
   % #2 : angle:radius for end point control
   %
-  % ---------------------------------------------------------  
+  % ---------------------------------------------------------
   .. controls ++(#1) and ++(#2) ..}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
