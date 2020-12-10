@@ -23,6 +23,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \usepackage{filecontents}
+\usepackage{fancyvrb}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % General functions
@@ -41,7 +42,7 @@
   \xdef\@piv@relpath{#1}
   % Start a background Python server
 \begin{@pie@shell}
-curdir=$(pwd) &&
+curdir=$(pwd) $() &&
 cd \@piv@relpath &&
 python server.py &
 \end{@pie@shell}
@@ -177,10 +178,10 @@ cd \@piv@relpath && ./client "<exec> #1"
   %
   % ---------------------------------------------------------
 \begin{@pie@shell}%
-curdir=$(pwd) &&
+curdir=$(pwd) $() &&
 cd \@piv@relpath &&
 ./client "#2" &&
-mv result.tex $curdir
+mv result.tex $curdir $()
 \end{@pie@shell}%
   \input{result.tex}%
   \ifthenelse{\equal{\out}{PYKZ_FAIL}}{%
