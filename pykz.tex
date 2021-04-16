@@ -52,6 +52,8 @@ sleep \@piv@python@delay
 \end{@pie@shell}
   % Determine path to directory where latex_common resides
   \pykzmathinline[@piv@pypath]{'\@piv@relpath'[:'\@piv@relpath'.find('latex_common')]}
+  % Include mathematical plotting functionality
+  \input{\@piv@relpath/pyplot.tex}
 }
 
 \NewEnviron{@pie@shell}{%
@@ -221,6 +223,13 @@ cd \@piv@relpath && ./client "<function> #1"
 % Drawing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\newcommand{\shift}[2]{%
+  %
+  % Shift a point #1 by amount #2.
+  %
+  ($(#1)+(#2)$)%
+}
+
 \renewcommand{\bezier}[2]{%
   % ---------------------------------------------------------
   %
@@ -263,17 +272,6 @@ cd \@piv@relpath && ./client "<function> #1"
   \coordinate (loc) at (\@pos@x,\@pos@y);
 }{
   \endpykzpicture
-}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Drawing helpers
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\newcommand{\shift}[2]{%
-  %
-  % Shift a point #1 by amount #2.
-  %
-  ($(#1)+(#2)$)%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

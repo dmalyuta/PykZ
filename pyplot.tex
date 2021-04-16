@@ -1,0 +1,530 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Plotting with PykZ
+%
+% A package that provides facilities for making plots of mathematical functions
+% using PykZ.
+%
+% Some conventions:
+%
+%   \@pyplot@<name> : PykZ plotting variable
+%   \pyplot@<name> : PykZ plotting function
+%   \pyplot@internal@<name> : PykZ plotting internal function, don't touch!
+%
+% Danylo Malyuta, 2021
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\makeatletter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Working with layers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\def\@pykz@layers{main}
+
+% Add a new layer behind all current layers
+\newcommand{\pykz@add@layer@below}[1]{
+  \pgfdeclarelayer{#1}
+  \xdef\@pykz@layers{#1,\@pykz@layers}
+  \pgfsetlayers{\@pykz@layers}
+}
+
+% Add a new layer in front of all current layers
+\newcommand{\pykz@add@layer@above}[1]{
+  \pgfdeclarelayer{#1}
+  \xdef\@pykz@layers{\@pykz@layers,#1}
+  \pgfsetlayers{\@pykz@layers}
+}
+
+% Define a layer "in front"
+\pykz@add@layer@above{pyplot fg}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plotting variables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\def\@pyplot@arrow{Stealth[round]}
+\def\@pyplot@unit{cm}
+\def\@pyplot@plotarea@x@size{2}
+\def\@pyplot@plotarea@y@size{2}
+\def\@pyplot@plotarea@xmin{-1}
+\def\@pyplot@plotarea@xcenter{0}
+\def\@pyplot@plotarea@xmax{1}
+\def\@pyplot@plotarea@ymin{-1}
+\def\@pyplot@plotarea@ycenter{0}
+\def\@pyplot@plotarea@ymax{1}
+\def\@pyplot@axarea@pad@left{0}
+\def\@pyplot@axarea@pad@right{0}
+\def\@pyplot@axarea@pad@top{0}
+\def\@pyplot@axarea@pad@bottom{0}
+\def\@pyplot@map@precision{4}
+\def\@pyplot@python@maxchar{1015}
+\def\@pyplot@background@color{white}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Drawing styles
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\tikzset{
+  pyplot axis/.style={
+    -\@pyplot@arrow,
+    black
+  },
+  pyplot axis label/.style={},
+  pyplot plot area debug/.style={
+    dashed,
+    opacity=0.5
+  },
+  pyplot mark position/.style args={#1(#2)}{
+    postaction={
+      decorate,
+      decoration={
+        markings,
+        mark=at position #1 with \coordinate (#2);
+      }
+    }
+  },
+  pyplot major tick/.style={
+    line width=0.3
+  },
+  pyplot major tick label/.style={
+    inner sep=0.03\@pyplot@unit
+  },
+  pyplot tick background/.style={
+    \@pyplot@background@color,
+    rounded corners=\@pyplot@ticks@size/2
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Public functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Define the units. In all commands, leave numbers dimensionles!
+\newcommand{\pyplot@set@unit}[1]{
+  \xdef\@pyplot@unit{#1}
+}
+
+% Define the units. In all commands, leave numbers dimensionles!
+\newcommand{\pyplot@set@bg}[1]{
+  \xdef\@pyplot@background@color{#1}
+}
+
+% Define the plot size
+\newcommand{\pyplot@set@size}[2]{
+  \xdef\@pyplot@plotarea@x@size{#1*1\@pyplot@unit}
+  \xdef\@pyplot@plotarea@y@size{#2*1\@pyplot@unit}
+}
+
+% Define the x-axis limits
+\define@key{@pyplot@keys}{center}{\def\@pyplot@plotarea@center{#1}}
+\newcommand{\pyplot@set@xlim}[3][]{
+  \setkeys{@pyplot@keys}{center=\@pyplot@plotarea@xcenter,#1}%
+  \xdef\@pyplot@plotarea@xcenter{\@pyplot@plotarea@center}
+  \xdef\@pyplot@plotarea@xmin{#2}
+  \xdef\@pyplot@plotarea@xmax{#3}
+}
+
+% Define the y-axis limits
+\newcommand{\pyplot@set@ylim}[3][]{
+  \setkeys{@pyplot@keys}{center=\@pyplot@plotarea@ycenter,#1}%
+  \xdef\@pyplot@plotarea@ycenter{\@pyplot@plotarea@center}
+  \xdef\@pyplot@plotarea@ymin{#2}
+  \xdef\@pyplot@plotarea@ymax{#3}
+}
+
+% Define the padding around the plot area
+\define@key{@pyplot@keys}{left}{\def\@pyplot@axarea@pad@left@key{#1}}
+\define@key{@pyplot@keys}{right}{\def\@pyplot@axarea@pad@right@key{#1}}
+\define@key{@pyplot@keys}{top}{\def\@pyplot@axarea@pad@top@key{#1}}
+\define@key{@pyplot@keys}{bottom}{\def\@pyplot@axarea@pad@bottom@key{#1}}
+\newcommand{\pyplot@set@padding}[1]{
+  \setkeys{@pyplot@keys}{left=\@pyplot@axarea@pad@left,#1}%
+  \setkeys{@pyplot@keys}{right=\@pyplot@axarea@pad@right,#1}%
+  \setkeys{@pyplot@keys}{top=\@pyplot@axarea@pad@top,#1}%
+  \setkeys{@pyplot@keys}{bottom=\@pyplot@axarea@pad@bottom,#1}
+  \xdef\@pyplot@axarea@pad@left{\@pyplot@axarea@pad@left@key*1\@pyplot@unit}
+  \xdef\@pyplot@axarea@pad@right{\@pyplot@axarea@pad@right@key*1\@pyplot@unit}
+  \xdef\@pyplot@axarea@pad@top{\@pyplot@axarea@pad@top@key*1\@pyplot@unit}
+  \xdef\@pyplot@axarea@pad@bottom{\@pyplot@axarea@pad@bottom@key*1\@pyplot@unit}
+}
+
+% Draw the axes
+\define@key{@pyplot@keys}{showarea}{\def\@pyplot@show@area@debug{#1}}
+\newcommand{\pyplot@draw@axes}[1][]{
+  \setkeys{@pyplot@keys}{showarea=false,#1}
+
+  \coordinate (pyplot origin) at (0,0);
+
+  % ..:: x-axis ::..
+
+  \pgfmathsetmacro{\@pyplot@negative@frac}{%
+    (\@pyplot@plotarea@xcenter-\@pyplot@plotarea@xmin)/
+    (\@pyplot@plotarea@xmax-\@pyplot@plotarea@xmin)}
+  \pgfmathsetmacro{\@pyplot@positive@frac}{%
+    1-\@pyplot@negative@frac}
+
+  \coordinate (pyplot plotarea left) at ($(pyplot origin)+
+  (-\@pyplot@negative@frac*\@pyplot@plotarea@x@size,0)$);
+
+  \coordinate (pyplot plotarea right) at ($(pyplot origin)+
+  (\@pyplot@positive@frac*\@pyplot@plotarea@x@size,0)$);
+
+  \coordinate (pyplot axarea left) at ($(pyplot plotarea left)+
+  (-\@pyplot@axarea@pad@left,0)$);
+
+  \coordinate (pyplot axarea right) at ($(pyplot plotarea right)+
+  (\@pyplot@axarea@pad@right,0)$);
+
+  \path let
+  \p1=(pyplot plotarea left),
+  \p2=(pyplot plotarea right) in \pgfextra{
+    \xdef\@pyplot@plotarea@tikz@xmin{\x1}
+    \xdef\@pyplot@plotarea@tikz@xmax{\x2}
+    \dimensionalize[unit=\@pyplot@unit]{\@pyplot@plotarea@tikz@xmin,
+      \@pyplot@plotarea@tikz@xmax}
+    \dimensionalize[unit=]{\@pyplot@plotarea@tikz@xmin,
+      \@pyplot@plotarea@tikz@xmax}
+  };
+
+  \draw[pyplot axis] (pyplot axarea left) -- (pyplot axarea right)
+  node[pos=0](pyplot x base){} node[pos=1](pyplot x tip){};
+
+  % ..:: y-axis ::..
+
+  \pgfmathsetmacro{\@pyplot@negative@frac}{%
+    (\@pyplot@plotarea@ycenter-\@pyplot@plotarea@ymin)/
+    (\@pyplot@plotarea@ymax-\@pyplot@plotarea@ymin)}
+  \pgfmathsetmacro{\@pyplot@positive@frac}{%
+    1-\@pyplot@negative@frac}
+
+  \coordinate (pyplot plotarea bottom) at ($(pyplot origin)+
+  (0,-\@pyplot@negative@frac*\@pyplot@plotarea@y@size)$);
+
+  \coordinate (pyplot plotarea top) at ($(pyplot origin)+
+  (0,\@pyplot@positive@frac*\@pyplot@plotarea@y@size)$);
+
+  \coordinate (pyplot axarea bottom) at ($(pyplot plotarea bottom)+
+  (0,-\@pyplot@axarea@pad@bottom)$);
+
+  \coordinate (pyplot axarea top) at ($(pyplot plotarea top)+
+  (0,\@pyplot@axarea@pad@top)$);
+
+  \path let
+  \p1=(pyplot plotarea bottom),
+  \p2=(pyplot plotarea top) in \pgfextra{
+    \xdef\@pyplot@plotarea@tikz@ymin{\y1}
+    \xdef\@pyplot@plotarea@tikz@ymax{\y2}
+    \dimensionalize[unit=\@pyplot@unit]{\@pyplot@plotarea@tikz@ymin,
+      \@pyplot@plotarea@tikz@ymax}
+    \dimensionalize[unit=]{\@pyplot@plotarea@tikz@ymin,
+      \@pyplot@plotarea@tikz@ymax}
+  };
+
+  \draw[pyplot axis] (pyplot axarea bottom) -- (pyplot axarea top)
+  node[pos=0](pyplot y base){} node[pos=1](pyplot y tip){};
+
+  % ..:: Other handy variables while we're here ::..
+
+  \coordinate (pyplot plotarea bottom left) at
+  (pyplot plotarea left|-pyplot plotarea bottom);
+
+  \coordinate (pyplot plotarea top right) at
+  (pyplot plotarea top-|pyplot plotarea right);
+
+  \coordinate (pyplot axarea bottom left) at
+  (pyplot axarea left|-pyplot axarea bottom);
+
+  \coordinate (pyplot axarea top right) at
+  (pyplot axarea top-|pyplot axarea right);
+
+  \ifthenelse{\equal{\@pyplot@show@area@debug}{true}}{
+    \draw[pyplot plot area debug]
+    (pyplot plotarea bottom left) rectangle (pyplot plotarea top right);
+    \draw[pyplot plot area debug]
+    (pyplot axarea bottom left) rectangle (pyplot axarea top right);
+  }{}
+
+  \pyplot@generate@scaling@function
+}
+
+% Generate a command that produce node scaling to required text height
+\newcommand{\pyplot@generate@scaling@function}{
+  \coordinate (pyplot plotarea middle) at
+  ($(pyplot plotarea bottom left)!0.5!(pyplot plotarea top right)$);
+
+  \begin{scope}
+    % Clip so that the invisible node doesn't take up any more space than
+    % the actual plot
+    \clip (pyplot plotarea bottom left) rectangle (pyplot plotarea top right);
+
+    % Invisible normal font example label, just for its size
+    \node (pyplot tmp) at (pyplot plotarea middle)
+    {\phantom{$123$}};
+
+    % Compute the scaling
+    \path let
+    \p1=(pyplot tmp.south),
+    \p2=(pyplot tmp.north) in \pgfextra{
+      \tikzmath{\@pyplot@internal@text@normal@height = \y2-\y1;}
+      \dimensionalize[unit=\@pyplot@unit]{\@pyplot@internal@text@normal@height}
+      \xdef\@pyplot@internal@text@normal@height{
+        \@pyplot@internal@text@normal@height}
+    };
+  \end{scope}
+
+  \newcommand{\pyplot@internal@compute@scaling}[1]{
+    \tikzmath{\@pyplot@label@scale=##1\@pyplot@unit/
+      \@pyplot@internal@text@normal@height;}
+    \xdef\@pyplot@label@scale{\@pyplot@label@scale}
+  }
+}
+
+% Add axis ticks
+\define@key{@pyplot@keys}{axis}{\def\@pyplot@tick@axis{#1}}
+\define@key{@pyplot@keys}{internal axis}{\def\@pyplot@tick@internal@axis{#1}}
+\define@key{@pyplot@keys}{min}{\def\@pyplot@ticks@min{#1}}
+\define@key{@pyplot@keys}{max}{\def\@pyplot@ticks@max{#1}}
+\define@key{@pyplot@keys}{count}{\def\@pyplot@ticks@count{#1}}
+\define@key{@pyplot@keys}{tick size}{\def\@pyplot@ticks@size{#1}}
+\define@key{@pyplot@keys}{label size}{\def\@pyplot@tick@label@size{#1}}
+\define@key{@pyplot@keys}{label offset}{\def\@pyplot@tick@label@offset{#1}}
+\define@key{@pyplot@keys}{format}{\def\@pyplot@label@format{#1}}
+% The main command to add ticks
+\newcommand{\pyplot@add@ticks}[1]{
+  \setkeys{@pyplot@keys}{axis=,#1}
+  \pykzmathinline[@pyplot@num@ax]{len('\@pyplot@tick@axis')}
+  \pgfmathparse{\@pyplot@num@ax>=1 ? 1 : 0}
+  \ifthenelse{\pgfmathresult>0}{
+    \foreach \@ax@i in {1,...,\@pyplot@num@ax} {
+      \pykzmathinline[@pyplot@which@ax]{'\@pyplot@tick@axis'[\@ax@i-1]}
+      \pyplot@internal@add@ticks{internal axis=\@pyplot@which@ax, #1}
+    }
+  }{}
+}
+% Internal command that gets called to draw the ticks
+\newcommand{\pyplot@internal@add@ticks}[1]{
+  % ..:: Select axis ::..
+  \setkeys{@pyplot@keys}{internal axis=,#1}
+  \ifthenelse{\equal{\@pyplot@tick@internal@axis}{}}{
+    \PackageError{pyplot}{Unspecified axis}{Set axis=x or axis=y}
+  }{}
+
+  % ..:: Min and max values that ticks span ::..
+  \ifthenelse{\equal{\@pyplot@tick@internal@axis}{x}}{
+    \setkeys{@pyplot@keys}{min=\@pyplot@plotarea@xmin,#1}
+    \setkeys{@pyplot@keys}{max=\@pyplot@plotarea@xmax,#1}
+  }{
+    \setkeys{@pyplot@keys}{min=\@pyplot@plotarea@ymin,#1}
+    \setkeys{@pyplot@keys}{max=\@pyplot@plotarea@ymax,#1}
+  }
+
+  % ..:: Other parameters ::..
+  \setkeys{@pyplot@keys}{count=5,#1}
+  \setkeys{@pyplot@keys}{tick size=0.06\@pyplot@unit,#1}
+  \setkeys{@pyplot@keys}{label size=0.13,#1}
+  \pyplot@internal@compute@scaling{\@pyplot@tick@label@size}
+  \setkeys{@pyplot@keys}{label offset=0.1,#1}
+  \setkeys{@pyplot@keys}{format=.2f,#1}
+
+  % ..:: Set the tick label formatter ::..
+  \pykzexec{pyplot_label_fmt = lambda x: '{0:\@pyplot@label@format}'.format(x)}
+  \xdef\@pyplot@format@function{pyplot_label_fmt}
+
+  \pykzexec{pyplot_tick_y = lambda x: 0.0}
+  \foreach \@i in {1,...,\@pyplot@ticks@count} {
+
+    % ..:: Draw the "tick" ::..
+    \pykzmathinline[@pyplot@tick@value]{(\@i-1)/(\@pyplot@ticks@count-1)*(
+      \@pyplot@ticks@max-\@pyplot@ticks@min)+\@pyplot@ticks@min}
+    \ifthenelse{\equal{\@pyplot@tick@internal@axis}{x}}{
+      \tikzmath{\@pyplot@tick@pos=\pyplot@internal@map@x{\@pyplot@tick@value};}
+      \coordinate (pyplot tick pos) at ($(\@pyplot@tick@pos, 0.0)$|-origin);
+      \draw[pyplot major tick] (pyplot tick pos) -- ++(0,-\@pyplot@ticks@size)
+      node[pos=1](tick label coord){};
+    }{
+      \tikzmath{\@pyplot@tick@pos=\pyplot@internal@map@y{\@pyplot@tick@value};}
+      \coordinate (pyplot tick pos) at ($(0.0, \@pyplot@tick@pos)$-|origin);
+
+      \draw[pyplot major tick] (pyplot tick pos) -- ++(-\@pyplot@ticks@size,0)
+      node[pos=1](tick label coord){};
+    }
+
+    % ..:: Get tick label text (the number) ::..
+    \pykzmathinline[@pyplot@tick@label]{
+      \@pyplot@format@function(\@pyplot@tick@value)}
+    \pykzmathinline[@pyplot@tick@label@abs]{
+      \@pyplot@format@function(abs(\@pyplot@tick@label))}
+
+    % ..:: Absolute-value tick label just for centering ::..
+    \ifthenelse{\equal{\@pyplot@tick@internal@axis}{x}}{
+      \def\@pyplot@internal@tick@label@anchor{north}
+      \def\@pyplot@internal@tick@label@shift{
+        0,-\@pyplot@tick@label@offset\@pyplot@unit}
+    }{
+      \def\@pyplot@internal@tick@label@anchor{east}
+      \def\@pyplot@internal@tick@label@shift{
+        -\@pyplot@tick@label@offset\@pyplot@unit,0}
+    }
+    \node[pyplot major tick label,
+    scale=\@pyplot@label@scale,
+    anchor=\@pyplot@internal@tick@label@anchor,
+    shift={(\@pyplot@internal@tick@label@shift)},
+    opacity=0] (pyplot tick label) at (tick label coord)
+    {\phantom{$\@pyplot@tick@label@abs$}};
+
+    \begin{pgfonlayer}{pyplot fg}
+      % ..:: Background of the tick label ::..
+      \fill[pyplot tick background]
+      (pyplot tick label.south west) rectangle (pyplot tick label.north east);
+
+      % ..:: The actual tick label ::..
+      \node[pyplot major tick label,
+      scale=\@pyplot@label@scale,
+      anchor=north east] at (pyplot tick label.north east)
+      {$\@pyplot@tick@label$};
+    \end{pgfonlayer}
+
+  }
+}
+
+% Create axis label
+\define@key{@pyplot@keys}{label}{\def\@pyplot@axis@label@text{#1}}
+\define@key{@pyplot@keys}{anchor}{\def\@pyplot@axis@label@anchor{#1}}
+\define@key{@pyplot@keys}{xshift}{\def\@pyplot@axis@label@xshift{#1}}
+\define@key{@pyplot@keys}{yshift}{\def\@pyplot@axis@label@yshift{#1}}
+\define@key{@pyplot@keys}{rotate}{\def\@pyplot@axis@label@rotate{#1}}
+\newcommand{\pyplot@axis@label}[1]{
+  \setkeys{@pyplot@keys}{axis=,#1}
+  \ifthenelse{\equal{\@pyplot@tick@axis}{}}{
+    \PackageError{pyplot}{Unspecified axis}{Set axis=x or axis=y}
+  }{}
+
+  \setkeys{@pyplot@keys}{label=,#1}
+
+  \ifthenelse{\equal{\@pyplot@tick@axis}{x}}{
+    \setkeys{@pyplot@keys}{anchor=south east,#1}
+    \setkeys{@pyplot@keys}{xshift=0,#1}
+    \setkeys{@pyplot@keys}{yshift=0.15,#1}
+  }{
+    \setkeys{@pyplot@keys}{anchor=north east,#1}
+    \setkeys{@pyplot@keys}{xshift=-0.15,#1}
+    \setkeys{@pyplot@keys}{yshift=0,#1}
+  }
+
+  \setkeys{@pyplot@keys}{rotate=0,#1}
+  \setkeys{@pyplot@keys}{label size=0.18,#1}
+  \pyplot@internal@compute@scaling{\@pyplot@tick@label@size}
+
+  % Draw the label
+  \def\@pyplot@tmp@tip{ tip}
+  \node[pyplot axis label,
+  anchor=\@pyplot@axis@label@anchor,
+  scale=\@pyplot@label@scale,
+  xshift=\@pyplot@axis@label@xshift\@pyplot@unit,
+  yshift=\@pyplot@axis@label@yshift\@pyplot@unit]
+  at (pyplot \@pyplot@tick@axis\@pyplot@tmp@tip)
+  {\@pyplot@axis@label@text};
+}
+
+% Map x value from math to TikZ coordinates
+\newcommand{\pyplot@internal@map@x}[1]{
+  ((#1-\@pyplot@plotarea@xmin)/(\@pyplot@plotarea@xmax-\@pyplot@plotarea@xmin)*
+  (\@pyplot@plotarea@tikz@xmax-\@pyplot@plotarea@tikz@xmin)+
+  \@pyplot@plotarea@tikz@xmin)
+}
+
+% Map y value from math to TikZ coordinates
+\newcommand{\pyplot@internal@map@y}[1]{
+  ((#1-\@pyplot@plotarea@ymin)/(\@pyplot@plotarea@ymax-\@pyplot@plotarea@ymin)*
+  (\@pyplot@plotarea@tikz@ymax-\@pyplot@plotarea@tikz@ymin)+
+  \@pyplot@plotarea@tikz@ymin)
+}
+
+% Generate a linear range of N points from min to max
+\newcommand{\pyplot@linrange}[4]{
+  \def\@pyplot@linrange@name{#1}
+  \def\@pyplot@linrange@min{#2}
+  \def\@pyplot@linrange@max{#3}
+  \def\@pyplot@linrange@N{#4}
+  \pykzexec{\@pyplot@linrange@name=np.linspace(\@pyplot@linrange@min,
+    \@pyplot@linrange@max,\@pyplot@linrange@N)}
+}
+
+% Map a function over an x-range to generate (x,y) data.
+\newcommand{\pyplot@map}[3][]{
+  \def\@pyplot@xy@data@name{#1}
+  \def\@pyplot@x@data{#2}
+  \def\@pyplot@function{#3}
+
+  % Determine max stride
+  \pykzmathinline[@pyplot@x@data@size]{len(\@pyplot@x@data)}
+  \pykzmathinline[@pyplot@unit@strlen]{len('\@pyplot@unit')}
+
+  \tikzmath{
+    \@pyplot@map@stride = int(floor(\@pyplot@python@maxchar/(
+    2*(9+\@pyplot@map@precision+\@pyplot@unit@strlen)+4)));
+    \@pyplot@stride@steps = int(\@pyplot@x@data@size/\@pyplot@map@stride)+1;
+  }
+
+  \def\@pyplot@exp{e}
+  \pykzexec{pyplot_inbounds = lambda x, y:
+    x>=\@pyplot@plotarea@xmin and
+    x<=\@pyplot@plotarea@xmax and
+    y>=\@pyplot@plotarea@ymin and
+    y<=\@pyplot@plotarea@ymax}
+
+  \def\@pyplot@xy@data{}
+  \foreach \@i in {1,...,\@pyplot@stride@steps} {
+    \pykzmathinline[pyplot@xy@batch]{
+      ' '.join('({0:.\@pyplot@map@precision\@pyplot@exp}*1\@pyplot@unit,%
+      {1:.\@pyplot@map@precision\@pyplot@exp}*1\@pyplot@unit)'.format(
+      \pyplot@internal@map@x{_x},
+      \pyplot@internal@map@y{\@pyplot@function(_x)}
+      ) if pyplot_inbounds(_x, \@pyplot@function(_x)) else ''
+      for _x in
+      \@pyplot@x@data[(\@i-1)*\@pyplot@map@stride:min(\@i*\@pyplot@map@stride,
+      \@pyplot@x@data@size)])}
+    \xdef\@pyplot@xy@data{\@pyplot@xy@data \pyplot@xy@batch}
+  }
+
+  \ifthenelse{\equal{\@pyplot@xy@data@name}{}}{}{
+    \expandafter\xdef\csname \@pyplot@xy@data@name\endcsname{\@pyplot@xy@data}}%
+}
+
+% Create a callable colormap object cmap(x)
+\define@key{@pyplot@keys}{map}{\def\@pyplot@colormap@style{#1}}
+\define@key{@pyplot@keys}{name}{\def\@pyplot@colormap@function@name{#1}}
+\newcommand{\pyplot@colormap}[3][]{
+  \setkeys{@pyplot@keys}{map=inferno,#1}
+  \setkeys{@pyplot@keys}{name=@cmap,#1}
+  \def\@pyplot@colormap@min{#2}
+  \def\@pyplot@colormap@max{#3}
+  \pykzexec{import matplotlib as mpl}
+  \pykzexec{from matplotlib import pyplot as plt}
+  \pykzexec{cmap_base = plt.get_cmap('\@pyplot@colormap@style')}
+  \pykzexec{cmap_nrm = mpl.colors.Normalize(vmin=\@pyplot@colormap@min,
+    vmax=\@pyplot@colormap@max)}
+  \pykzexec{cmap_rgba = mpl.cm.ScalarMappable(norm=cmap_nrm, cmap=cmap_base)}
+  \pykzexec{cmap = lambda x : ('{0}'.format(mpl.colors.to_hex(
+    cmap_rgba.to_rgba(x))))[1:]}
+  % Make a function which you can call to generate a new color
+  \expandafter\newcommand\csname\@pyplot@colormap@function@name\endcsname[2][]{
+    \pykzmathinline[@pyplot@colormap@clr]{cmap(##2)}
+    \definecolor{##1}{HTML}{\@pyplot@colormap@clr}
+  }
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Private functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% TODO
+
+\makeatother
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
