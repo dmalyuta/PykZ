@@ -46,6 +46,7 @@
 
 \def\@pyplot@arrow{Stealth[round]}
 \def\@pyplot@unit{cm}
+\def\@pyplot@clip{True}
 \def\@pyplot@plotarea@x@size{2}
 \def\@pyplot@plotarea@y@size{2}
 \def\@pyplot@plotarea@xmin{-1}
@@ -106,9 +107,15 @@
   \xdef\@pyplot@unit{#1}
 }
 
-% Define the units. In all commands, leave numbers dimensionles!
+% Define the background color
 \newcommand{\pyplot@set@bg}[1]{
   \xdef\@pyplot@background@color{#1}
+}
+
+% Set whether the plotted function coordinates are clipped before being
+% returned to the user
+\newcommand{\pyplot@set@clip}[1]{
+  \xdef\@pyplot@clip{#1}
 }
 
 % Define the plot size
@@ -152,8 +159,10 @@
 
 % Draw the axes
 \define@key{@pyplot@keys}{showarea}{\def\@pyplot@show@area@debug{#1}}
+\define@key{@pyplot@keys}{yaxloc}{\def\@pyplot@y@axis@draw@location{#1}}
 \newcommand{\pyplot@draw@axes}[1][]{
   \setkeys{@pyplot@keys}{showarea=false,#1}
+  \setkeys{@pyplot@keys}{yaxloc=center,#1}
 
   \coordinate (pyplot origin) at (0,0);
 
@@ -193,16 +202,22 @@
 
   % ..:: y-axis ::..
 
+  \ifthenelse{\equal{\@pyplot@y@axis@draw@location}{center}}{
+    \gdef\@pyplot@y@axis@draw@ref@point{pyplot origin}
+  }{
+    \gdef\@pyplot@y@axis@draw@ref@point{pyplot axarea left}
+  }
+
   \pgfmathsetmacro{\@pyplot@negative@frac}{%
     (\@pyplot@plotarea@ycenter-\@pyplot@plotarea@ymin)/
     (\@pyplot@plotarea@ymax-\@pyplot@plotarea@ymin)}
   \pgfmathsetmacro{\@pyplot@positive@frac}{%
     1-\@pyplot@negative@frac}
 
-  \coordinate (pyplot plotarea bottom) at ($(pyplot origin)+
+  \coordinate (pyplot plotarea bottom) at ($(\@pyplot@y@axis@draw@ref@point)+
   (0,-\@pyplot@negative@frac*\@pyplot@plotarea@y@size)$);
 
-  \coordinate (pyplot plotarea top) at ($(pyplot origin)+
+  \coordinate (pyplot plotarea top) at ($(\@pyplot@y@axis@draw@ref@point)+
   (0,\@pyplot@positive@frac*\@pyplot@plotarea@y@size)$);
 
   \coordinate (pyplot axarea bottom) at ($(pyplot plotarea bottom)+
@@ -340,13 +355,14 @@
       \@pyplot@ticks@max-\@pyplot@ticks@min)+\@pyplot@ticks@min}
     \ifthenelse{\equal{\@pyplot@tick@internal@axis}{x}}{
       \tikzmath{\@pyplot@tick@pos=\pyplot@internal@map@x{\@pyplot@tick@value};}
-      \coordinate (pyplot tick pos) at ($(\@pyplot@tick@pos, 0.0)$|-origin);
+      \coordinate (tmp) at (\@pyplot@tick@pos, 0.0);
+      \coordinate (pyplot tick pos) at (tmp|-pyplot origin);
       \draw[pyplot major tick] (pyplot tick pos) -- ++(0,-\@pyplot@ticks@size)
       node[pos=1](tick label coord){};
     }{
       \tikzmath{\@pyplot@tick@pos=\pyplot@internal@map@y{\@pyplot@tick@value};}
-      \coordinate (pyplot tick pos) at ($(0.0, \@pyplot@tick@pos)$-|origin);
-
+      \coordinate (tmp) at (0.0, \@pyplot@tick@pos);
+      \coordinate (pyplot tick pos) at (tmp-|\@pyplot@y@axis@draw@ref@point);
       \draw[pyplot major tick] (pyplot tick pos) -- ++(-\@pyplot@ticks@size,0)
       node[pos=1](tick label coord){};
     }
@@ -470,10 +486,11 @@
 
   \def\@pyplot@exp{e}
   \pykzexec{pyplot_inbounds = lambda x, y:
-    x>=\@pyplot@plotarea@xmin and
+    (not \@pyplot@clip) or
+    (x>=\@pyplot@plotarea@xmin and
     x<=\@pyplot@plotarea@xmax and
     y>=\@pyplot@plotarea@ymin and
-    y<=\@pyplot@plotarea@ymax}
+    y<=\@pyplot@plotarea@ymax)}
 
   \def\@pyplot@xy@data{}
   \foreach \@i in {1,...,\@pyplot@stride@steps} {
@@ -514,6 +531,36 @@
     \pykzmathinline[@pyplot@colormap@clr]{cmap(##2)}
     \definecolor{##1}{HTML}{\@pyplot@colormap@clr}
   }
+}
+
+% Create a clipped plot area within which elemnts are not draw if they fall
+% outside the plot area
+\define@key{@pyplot@keys}{pad}{\def\@pyplot@clip@area@pad{#1}}
+\define@key{@pyplot@keys}{leftpad}{\def\@pyplot@clip@area@pad@left{#1}}
+\newenvironment{pyplot@plot@area}[1][]{%
+  \setkeys{@pyplot@keys}{pad=0,#1}
+  \setkeys{@pyplot@keys}{leftpad=-1,#1}
+  \begin{scope}%
+    % General clipping area (apply global padding)
+    \coordinate (clip area bottom left) at
+    ($(pyplot plotarea bottom left)+(-\@pyplot@clip@area@pad,
+    -\@pyplot@clip@area@pad)$);
+    \coordinate (clip area top right) at
+    ($(pyplot plotarea top right)+(\@pyplot@clip@area@pad,
+    \@pyplot@clip@area@pad)$);
+
+    % Apply per-edge padding
+    \pgfmathparse{\@pyplot@clip@area@pad@left<0 ? 1:0}
+    \ifthenelse{\pgfmathresult>0}{}{
+      \coordinate (clip area bottom left) at
+      ($(clip area bottom left)+(\@pyplot@clip@area@pad-
+      \@pyplot@clip@area@pad@left,0)$);
+    }
+
+    % Make clipping area
+    \clip (clip area bottom left) rectangle (clip area top right);
+  }{%
+  \end{scope}%
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
