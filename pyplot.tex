@@ -91,10 +91,6 @@
   },
   pyplot major tick label/.style={
     inner sep=0.03\@pyplot@unit
-  },
-  pyplot tick background/.style={
-    \@pyplot@background@color,
-    rounded corners=\@pyplot@ticks@size/2
   }
 }
 
@@ -166,6 +162,15 @@
 
   \coordinate (pyplot origin) at (0,0);
 
+  % Adjust size for padding
+  \tikzmath{
+    \@pyplot@plotarea@x@size@padded = \@pyplot@plotarea@x@size-
+    \@pyplot@axarea@pad@left-\@pyplot@axarea@pad@right;
+    \@pyplot@plotarea@y@size@padded = \@pyplot@plotarea@y@size-
+    \@pyplot@axarea@pad@top-\@pyplot@axarea@pad@bottom;
+  }
+  \dimensionalize{\@pyplot@plotarea@x@size@padded, \@pyplot@plotarea@y@size@padded}
+
   % ..:: x-axis ::..
 
   \pgfmathsetmacro{\@pyplot@negative@frac}{%
@@ -175,10 +180,10 @@
     1-\@pyplot@negative@frac}
 
   \coordinate (pyplot plotarea left) at ($(pyplot origin)+
-  (-\@pyplot@negative@frac*\@pyplot@plotarea@x@size,0)$);
+  (-\@pyplot@negative@frac*\@pyplot@plotarea@x@size@padded,0)$);
 
   \coordinate (pyplot plotarea right) at ($(pyplot origin)+
-  (\@pyplot@positive@frac*\@pyplot@plotarea@x@size,0)$);
+  (\@pyplot@positive@frac*\@pyplot@plotarea@x@size@padded,0)$);
 
   \coordinate (pyplot axarea left) at ($(pyplot plotarea left)+
   (-\@pyplot@axarea@pad@left,0)$);
@@ -215,10 +220,10 @@
     1-\@pyplot@negative@frac}
 
   \coordinate (pyplot plotarea bottom) at ($(\@pyplot@y@axis@draw@ref@point)+
-  (0,-\@pyplot@negative@frac*\@pyplot@plotarea@y@size)$);
+  (0,-\@pyplot@negative@frac*\@pyplot@plotarea@y@size@padded)$);
 
   \coordinate (pyplot plotarea top) at ($(\@pyplot@y@axis@draw@ref@point)+
-  (0,\@pyplot@positive@frac*\@pyplot@plotarea@y@size)$);
+  (0,\@pyplot@positive@frac*\@pyplot@plotarea@y@size@padded)$);
 
   \coordinate (pyplot axarea bottom) at ($(pyplot plotarea bottom)+
   (0,-\@pyplot@axarea@pad@bottom)$);
@@ -302,10 +307,12 @@
 \define@key{@pyplot@keys}{min}{\def\@pyplot@ticks@min{#1}}
 \define@key{@pyplot@keys}{max}{\def\@pyplot@ticks@max{#1}}
 \define@key{@pyplot@keys}{count}{\def\@pyplot@ticks@count{#1}}
+\define@key{@pyplot@keys}{special}{\def\@pyplot@special@ticks{#1}}
 \define@key{@pyplot@keys}{tick size}{\def\@pyplot@ticks@size{#1}}
 \define@key{@pyplot@keys}{label size}{\def\@pyplot@tick@label@size{#1}}
 \define@key{@pyplot@keys}{label offset}{\def\@pyplot@tick@label@offset{#1}}
 \define@key{@pyplot@keys}{format}{\def\@pyplot@label@format{#1}}
+\define@key{@pyplot@keys}{contour}{\def\@pyplot@tick@contour{#1}}
 % The main command to add ticks
 \newcommand{\pyplot@add@ticks}[1]{
   \setkeys{@pyplot@keys}{axis=,#1}
@@ -336,23 +343,41 @@
   }
 
   % ..:: Other parameters ::..
-  \setkeys{@pyplot@keys}{count=5,#1}
+  \setkeys{@pyplot@keys}{count=2,#1}
+  \setkeys{@pyplot@keys}{special=,#1}
   \setkeys{@pyplot@keys}{tick size=0.06\@pyplot@unit,#1}
   \setkeys{@pyplot@keys}{label size=0.13,#1}
   \pyplot@internal@compute@scaling{\@pyplot@tick@label@size}
   \setkeys{@pyplot@keys}{label offset=0.1,#1}
   \setkeys{@pyplot@keys}{format=.2f,#1}
+  \setkeys{@pyplot@keys}{contour=1pt,#1}
 
   % ..:: Set the tick label formatter ::..
   \pykzexec{pyplot_label_fmt = lambda x: '{0:\@pyplot@label@format}'.format(x)}
   \xdef\@pyplot@format@function{pyplot_label_fmt}
 
-  \pykzexec{pyplot_tick_y = lambda x: 0.0}
-  \foreach \@i in {1,...,\@pyplot@ticks@count} {
+  % ..:: Generate ticks ::..
+  \pykzexec{tick_list = np.array([])}
+  \pgfmathparse{\@pyplot@ticks@count>0 ? 1 : 0}
+  \ifthenelse{\pgfmathresult>0}{
+    \foreach \@i in {1,...,\@pyplot@ticks@count} {
+      \pykzexec{new_tick = (\@i-1)/(\@pyplot@ticks@count-1)*(
+        \@pyplot@ticks@max-\@pyplot@ticks@min)+\@pyplot@ticks@min}
+      \pykzexec{tick_list = np.append(tick_list, [new_tick])}
+    }
+  }{}
+  \foreach \@special@tick in \@pyplot@special@ticks {
+    \echodebug{\@special@tick}
+    \pykzexec{tick_list = np.append(tick_list, [\@special@tick])}
+  }
+  \pykzmathinline[@pyplot@num@ticks]{tick_list.size}
+
+  % ..:: Plot ticks ::..
+  \contourlength{\@pyplot@tick@contour}
+  \foreach \@i in {1,...,\@pyplot@num@ticks} {
 
     % ..:: Draw the "tick" ::..
-    \pykzmathinline[@pyplot@tick@value]{(\@i-1)/(\@pyplot@ticks@count-1)*(
-      \@pyplot@ticks@max-\@pyplot@ticks@min)+\@pyplot@ticks@min}
+    \pykzmathinline[@pyplot@tick@value]{tick_list[\@i-1]}
     \ifthenelse{\equal{\@pyplot@tick@internal@axis}{x}}{
       \tikzmath{\@pyplot@tick@pos=\pyplot@internal@map@x{\@pyplot@tick@value};}
       \coordinate (tmp) at (\@pyplot@tick@pos, 0.0);
@@ -375,10 +400,12 @@
 
     % ..:: Absolute-value tick label just for centering ::..
     \ifthenelse{\equal{\@pyplot@tick@internal@axis}{x}}{
+      \def\@pyplot@internal@tick@label@phantom{\@pyplot@tick@label@abs}
       \def\@pyplot@internal@tick@label@anchor{north}
       \def\@pyplot@internal@tick@label@shift{
         0,-\@pyplot@tick@label@offset\@pyplot@unit}
     }{
+      \def\@pyplot@internal@tick@label@phantom{\@pyplot@tick@label}
       \def\@pyplot@internal@tick@label@anchor{east}
       \def\@pyplot@internal@tick@label@shift{
         -\@pyplot@tick@label@offset\@pyplot@unit,0}
@@ -388,18 +415,13 @@
     anchor=\@pyplot@internal@tick@label@anchor,
     shift={(\@pyplot@internal@tick@label@shift)},
     opacity=0] (pyplot tick label) at (tick label coord)
-    {\phantom{$\@pyplot@tick@label@abs$}};
+    {\phantom{$\@pyplot@internal@tick@label@phantom$}};
 
     \begin{pgfonlayer}{pyplot fg}
-      % ..:: Background of the tick label ::..
-      \fill[pyplot tick background]
-      (pyplot tick label.south west) rectangle (pyplot tick label.north east);
-
-      % ..:: The actual tick label ::..
       \node[pyplot major tick label,
       scale=\@pyplot@label@scale,
       anchor=north east] at (pyplot tick label.north east)
-      {$\@pyplot@tick@label$};
+      {\contour{\@pyplot@background@color}{$\@pyplot@tick@label$}};
     \end{pgfonlayer}
 
   }
