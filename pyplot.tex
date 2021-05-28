@@ -156,9 +156,11 @@
 % Draw the axes
 \define@key{@pyplot@keys}{showarea}{\def\@pyplot@show@area@debug{#1}}
 \define@key{@pyplot@keys}{yaxloc}{\def\@pyplot@y@axis@draw@location{#1}}
+\define@key{@pyplot@keys}{xaxloc}{\def\@pyplot@x@axis@draw@location{#1}}
 \newcommand{\pyplot@draw@axes}[1][]{
   \setkeys{@pyplot@keys}{showarea=false,#1}
   \setkeys{@pyplot@keys}{yaxloc=center,#1}
+  \setkeys{@pyplot@keys}{xaxloc=center,#1}
 
   \coordinate (pyplot origin) at (0,0);
 
@@ -213,11 +215,16 @@
     \gdef\@pyplot@y@axis@draw@ref@point{pyplot axarea left}
   }
 
-  \pgfmathsetmacro{\@pyplot@negative@frac}{%
-    (\@pyplot@plotarea@ycenter-\@pyplot@plotarea@ymin)/
-    (\@pyplot@plotarea@ymax-\@pyplot@plotarea@ymin)}
-  \pgfmathsetmacro{\@pyplot@positive@frac}{%
-    1-\@pyplot@negative@frac}
+  \ifthenelse{\equal{\@pyplot@x@axis@draw@location}{center}}{
+    \pgfmathsetmacro{\@pyplot@negative@frac}{%
+      (\@pyplot@plotarea@ycenter-\@pyplot@plotarea@ymin)/
+      (\@pyplot@plotarea@ymax-\@pyplot@plotarea@ymin)}
+    \pgfmathsetmacro{\@pyplot@positive@frac}{%
+      1-\@pyplot@negative@frac}
+  }{
+    \pgfmathsetmacro{\@pyplot@negative@frac}{0}
+    \pgfmathsetmacro{\@pyplot@positive@frac}{1}
+  }
 
   \coordinate (pyplot plotarea bottom) at ($(\@pyplot@y@axis@draw@ref@point)+
   (0,-\@pyplot@negative@frac*\@pyplot@plotarea@y@size@padded)$);
@@ -530,6 +537,15 @@
 
   \ifthenelse{\equal{\@pyplot@xy@data@name}{}}{}{
     \expandafter\xdef\csname \@pyplot@xy@data@name\endcsname{\@pyplot@xy@data}}%
+}
+
+% Place a TikZ coordinate at a specific (x,y) location
+\newcommand{\pyplot@point}[3][point]{
+  \pykzexec{pyplot__tmp_x = [#2]}
+  \pykzexec{pyplot__tmp_y = lambda x: #3}
+  \pyplot@map[@pt]{pyplot__tmp_x}{pyplot__tmp_y}
+  \node (pyplot__tmp_point) at \@pt {};
+  \coordinate (#1) at (pyplot__tmp_point.center);
 }
 
 % Create a callable colormap object cmap(x)
