@@ -215,6 +215,8 @@
     \gdef\@pyplot@y@axis@draw@ref@point{pyplot axarea left}
   }
 
+  \def\@pyplot@plotarea@bottom@shift{-\@pyplot@negative@frac*
+    \@pyplot@plotarea@y@size@padded}
   \ifthenelse{\equal{\@pyplot@x@axis@draw@location}{center}}{
     \pgfmathsetmacro{\@pyplot@negative@frac}{%
       (\@pyplot@plotarea@ycenter-\@pyplot@plotarea@ymin)/
@@ -224,10 +226,12 @@
   }{
     \pgfmathsetmacro{\@pyplot@negative@frac}{0}
     \pgfmathsetmacro{\@pyplot@positive@frac}{1}
+    \edef\@pyplot@plotarea@bottom@shift{\@pyplot@plotarea@bottom@shift+
+      \@pyplot@axarea@pad@bottom}
   }
 
-  \coordinate (pyplot plotarea bottom) at ($(\@pyplot@y@axis@draw@ref@point)+
-  (0,-\@pyplot@negative@frac*\@pyplot@plotarea@y@size@padded)$);
+  \coordinate (pyplot plotarea bottom) at
+  ($(\@pyplot@y@axis@draw@ref@point)+(0,\@pyplot@plotarea@bottom@shift)$);
 
   \coordinate (pyplot plotarea top) at ($(\@pyplot@y@axis@draw@ref@point)+
   (0,\@pyplot@positive@frac*\@pyplot@plotarea@y@size@padded)$);
@@ -301,7 +305,7 @@
     };
   \end{scope}
 
-  \newcommand{\pyplot@internal@compute@scaling}[1]{
+  \def\pyplot@internal@compute@scaling##1{
     \tikzmath{\@pyplot@label@scale=##1\@pyplot@unit/
       \@pyplot@internal@text@normal@height;}
     \xdef\@pyplot@label@scale{\@pyplot@label@scale}
@@ -315,6 +319,7 @@
 \define@key{@pyplot@keys}{max}{\def\@pyplot@ticks@max{#1}}
 \define@key{@pyplot@keys}{count}{\def\@pyplot@ticks@count{#1}}
 \define@key{@pyplot@keys}{special}{\def\@pyplot@special@ticks{#1}}
+\define@key{@pyplot@keys}{labels}{\def\@pyplot@tick@labels{#1}}
 \define@key{@pyplot@keys}{tick size}{\def\@pyplot@ticks@size{#1}}
 \define@key{@pyplot@keys}{label size}{\def\@pyplot@tick@label@size{#1}}
 \define@key{@pyplot@keys}{label offset}{\def\@pyplot@tick@label@offset{#1}}
@@ -352,6 +357,7 @@
   % ..:: Other parameters ::..
   \setkeys{@pyplot@keys}{count=2,#1}
   \setkeys{@pyplot@keys}{special=,#1}
+  \setkeys{@pyplot@keys}{labels=,#1}
   \setkeys{@pyplot@keys}{tick size=0.06\@pyplot@unit,#1}
   \setkeys{@pyplot@keys}{label size=0.13,#1}
   \pyplot@internal@compute@scaling{\@pyplot@tick@label@size}
@@ -359,9 +365,14 @@
   \setkeys{@pyplot@keys}{format=.2f,#1}
   \setkeys{@pyplot@keys}{contour=1pt,#1}
 
+  % ..:: Save custom labels to list ::..
+  \makelist{pyplot@list}{\@pyplot@tick@labels}
+
   % ..:: Set the tick label formatter ::..
   \pykzexec{pyplot_label_fmt = lambda x: '{0:\@pyplot@label@format}'.format(x)}
   \xdef\@pyplot@format@function{pyplot_label_fmt}
+  \pykzexec{import re;
+    is_number = lambda s: not any([c.isalpha() for c in s])}
 
   % ..:: Generate ticks ::..
   \pykzexec{tick_list = np.array([])}
@@ -374,7 +385,6 @@
     }
   }{}
   \foreach \@special@tick in \@pyplot@special@ticks {
-    \echodebug{\@special@tick}
     \pykzexec{tick_list = np.append(tick_list, [\@special@tick])}
   }
   \pykzmathinline[@pyplot@num@ticks]{tick_list.size}
@@ -400,10 +410,35 @@
     }
 
     % ..:: Get tick label text (the number) ::..
-    \pykzmathinline[@pyplot@tick@label]{
-      \@pyplot@format@function(\@pyplot@tick@value)}
-    \pykzmathinline[@pyplot@tick@label@abs]{
-      \@pyplot@format@function(abs(\@pyplot@tick@label))}
+    \pgfmathparse{\@i>\@pyplot@ticks@count ? 1:0}
+    \def\pyplot@numerical@tick{True}
+    \def\pyplot@special@tick{False}
+    \ifthenelse{\pgfmathresult>0}{
+      \def\pyplot@special@tick{True}
+      \tikzmath{\@j=int(\@i-\@pyplot@ticks@count);}
+      \edef\@pyplot@this@label{\list@nth{pyplot@list}{\@j}}
+      \pykzmathinline[is@number]{is_number('\@pyplot@this@label')}
+      \ifthenelse{\equal{\is@number}{True}}{
+        \edef\@pyplot@tick@value{\list@nth{pyplot@list}{\@j}}
+      }{
+        \def\pyplot@numerical@tick{False}
+        \def\@pyplot@tick@label{\list@nth{pyplot@list}{\@j}}
+        \def\@pyplot@tick@label@abs{\@pyplot@tick@label}
+      }
+    }{}
+    \ifthenelse{\equal{\pyplot@numerical@tick}{True}}{
+      \ifthenelse{\equal{\pyplot@special@tick}{False}}{
+        \pykzmathinline[@pyplot@tick@label]{
+          \@pyplot@format@function(\@pyplot@tick@value)}
+      }{
+        % Do not format the user-defined "special" ticks
+        \def\@pyplot@tick@label{\@pyplot@tick@value}
+      }
+      % Remove the minus sign for proper
+      \pykzmathinline[@pyplot@tick@label@abs]{
+        '\@pyplot@tick@label'[1:] if '\@pyplot@tick@label'[0]=='-' else
+        \@pyplot@tick@label}
+    }{}
 
     % ..:: Absolute-value tick label just for centering ::..
     \ifthenelse{\equal{\@pyplot@tick@internal@axis}{x}}{
