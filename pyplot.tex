@@ -366,7 +366,11 @@
   \setkeys{@pyplot@keys}{contour=1pt,#1}
 
   % ..:: Save custom labels to list ::..
-  \makelist{pyplot@list}{\@pyplot@tick@labels}
+  \ifthenelse{\equal{\@pyplot@tick@labels}{}}{
+    % Label directly using the tick value
+    \makelist{pyplot@list}{\@pyplot@special@ticks}}{
+    % Label using user-created tick labels
+    \makelist{pyplot@list}{\@pyplot@tick@labels}}
 
   % ..:: Set the tick label formatter ::..
   \pykzexec{pyplot_label_fmt = lambda x: '{0:\@pyplot@label@format}'.format(x)}
